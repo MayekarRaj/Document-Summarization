@@ -19,7 +19,7 @@ import nltk
 import re
 from nltk.tokenize import sent_tokenize
 
-nltk.download('punkt')
+nltk.download('punkt_tab')
 nltk.download('stopwords')
 
 st.set_page_config("Document Dialogue", layout="wide")
@@ -28,7 +28,7 @@ load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    st.error("🔑 Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
+    st.error("Google API key not found.")
 else:
     genai.configure(api_key=api_key)
 

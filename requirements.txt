@@ -5,6 +5,7 @@ langchain
 PyPDF2
 faiss-cpu
 langchain_google_genai
+langchain_community
 streamlit_markmap
 gtts 
 transformers

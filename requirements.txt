@@ -1,0 +1,13 @@
+streamlit==1.29.0
+google-generativeai
+python-dotenv
+langchain
+PyPDF2
+faiss-cpu
+langchain_google_genai
+streamlit_markmap
+gtts 
+transformers
+nltk
+wordninja
+torch

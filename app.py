@@ -12,14 +12,17 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 import google.generativeai as genai
 import streamlit as st
 from streamlit_markmap import markmap
-from transformers import pipeline
+# from transformers import pipeline
+from transformers import BartForConditionalGeneration, BartTokenizer
+import fitz  # PyMuPDF'
+import textwrap
 import torch
 import wordninja
 import nltk
 import re
 from nltk.tokenize import sent_tokenize
 
-nltk.download('punkt')
+nltk.download('punkt_tab')
 nltk.download('stopwords')
 
 st.set_page_config("Document Dialogue", layout="wide")
@@ -28,25 +31,25 @@ load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    st.error("🔑 Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
+    st.error("Google API key not found.")
 else:
     genai.configure(api_key=api_key)
 
 logging.basicConfig(level=logging.INFO)
 
-@st.cache_resource
-def load_summarizer():
-    try:
-        device = 0 if torch.cuda.is_available() else -1
-        summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=device)
-        logging.info(f"Summarization model loaded on device: {device}")
-        return summarizer
-    except Exception as e:
-        logging.error(f"Error loading summarizer: {e}")
-        st.error("Failed to load the summarization model.")
-        return None
+# @st.cache_resource
+# def load_summarizer():
+#     try:
+#         device = 0 if torch.cuda.is_available() else -1
+#         summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=device)
+#         logging.info(f"Summarization model loaded on device: {device}")
+#         return summarizer
+#     except Exception as e:
+#         logging.error(f"Error loading summarizer: {e}")
+#         st.error("Failed to load the summarization model.")
+#         return None
 
-summarizer = load_summarizer()
+# summarizer = load_summarizer()
 
 def gemini_image(image):
 
@@ -81,34 +84,32 @@ def clean_text(text):
     
     return text.strip()
 
-def getpdf(pdf_files):
-    """
-    Extract text and image descriptions from uploaded PDF files.
-    """
+def getpdf(pdf_file):
     text = ""
-    for pdf_file in pdf_files:
-        try:
-            pdf_reader = PdfReader(pdf_file)
-            for page_num, page in enumerate(pdf_reader.pages):
-                page_content = page.extract_text()
-                if page_content:
-                    cleaned_page = clean_text(page_content)
-                    text += cleaned_page + "\n"
-                    # text += page_content
-                # try:
-                #     xobject = page.get("/Resources", {}).get("/XObject", {})
-                #     for obj in xobject.values():
-                #         obj_type = obj.get("/Subtype", None)
-                #         if obj_type == "/Image":
-                #             image_data = obj.get_data()
-                #             image_file = BytesIO(image_data)
-                #             image_description = gemini_image(image_file)
-                #             text += f"\nPage {page_num + 1}: Image Description: {image_description}\n"
-                # except Exception as e:
-                #     logging.warning(f"No images found on page {page_num + 1}: {e}")
-        except Exception as e:
-            logging.error(f"Error reading PDF file {pdf_file.name}: {e}")
-            st.error(f"Failed to read PDF file {pdf_file.name}.")
+    # for pdf_file in pdf_files:
+    try:
+        pdf_reader = PdfReader(pdf_file)
+        for page_num, page in enumerate(pdf_reader.pages):
+            page_content = page.extract_text()
+            if page_content:
+                cleaned_page = clean_text(page_content)
+                text += cleaned_page + "\n"
+                # text += page_content
+            try:
+                xobject = page.get("/Resources", {}).get("/XObject", {})
+                for obj in xobject.values():
+                    obj_type = obj.get("/Subtype", None)
+                    if obj_type == "/Image":
+                        image_data = obj.get_data()
+                        image_file = BytesIO(image_data)
+                        image_description = gemini_image(image_file)
+                        text += f"\nPage {page_num + 1}: Image Description: {image_description}\n"
+            except Exception as e:
+                logging.warning(f"No images found on page {page_num + 1}: {e}")
+    except Exception as e:
+        logging.error(f"Error reading PDF file {pdf_file}: {e}")
+        st.error(f"Failed to read PDF file {pdf_file}.")
+
     return text                  
 
 def get_chunks(data, chunk_size=1000, chunk_overlap=200):
@@ -162,7 +163,7 @@ def get_conversation_chain(temp, top_k, top_p):
         logging.error(f"Error initializing conversation chain: {e}")
         st.error("Failed to initialize the conversation chain.")
         return None
-    
+
 def split_concatenated_words(text, min_word_length=15):
     words = text.split()
     split_words = []
@@ -260,31 +261,79 @@ def generate_markdown(text):
         st.error("An error occurred while generating the mindmap.")
 
 
-def generate_bart_summary(text, summarizer, max_length, min_length):
-    try:
-        # Split text into manageable chunks
-        chunks = get_chunks(text, chunk_size=1000, chunk_overlap=200)
-        summaries = []
+# def generate_bart_summary(text, summarizer, max_length, min_length):
+#     try:
+#         # Split text into manageable chunks
+#         chunks = get_chunks(text, chunk_size=1000, chunk_overlap=200)
+#         summaries = []
         
-        for chunk in chunks:
-            try:
-                summary_result = summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)
-                summary = summary_result[0]['summary_text']
-                summaries.append(summary)
-            except Exception as e:
-                st.error("An error occurred while generating the summary.")
-                logging.error(f"Error summarizing chunk: {e}")
+#         for chunk in chunks:
+#             try:
+#                 summary_result = summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)
+#                 summary = summary_result[0]['summary_text']
+#                 summaries.append(summary)
+#             except Exception as e:
+#                 st.error("An error occurred while generating the summary.")
+#                 logging.error(f"Error summarizing chunk: {e}")
         
-        final_summary = ' '.join(summaries)
+#         final_summary = ' '.join(summaries)
         
-        word_count = len(final_summary.split())
-        st.session_state.summary_word_count = word_count
+#         word_count = len(final_summary.split())
+#         st.session_state.summary_word_count = word_count
         
-        logging.info("Summary generation completed successfully.")
-        return final_summary
-    except Exception as e:
-        logging.error(f"Error generating BART summary: {e}")
-        return "Summary generation unavailable."
+#         logging.info("Summary generation completed successfully.")
+#         return final_summary
+#     except Exception as e:
+#         logging.error(f"Error generating BART summary: {e}")
+#         return "Summary generation unavailable."
+
+def extract_text_from_pdf(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page_num in range(doc.page_count):
+        page = doc[page_num]
+        text += page.get_text()
+    doc.close()
+    return text
+
+def text_summarizer_from_pdf(pdf_text, max_len = 500, min_len = 180):
+    model_name = "facebook/bart-large-cnn"
+    model = BartForConditionalGeneration.from_pretrained(model_name)
+    tokenizer = BartTokenizer.from_pretrained(model_name)
+
+    inputs = tokenizer.encode("summarize: " + pdf_text, return_tensors="pt", max_length=1024, truncation=True, )
+    summary_ids = model.generate(inputs, max_length=max_len, min_length=min_len, length_penalty=2.0, num_beams=4, early_stopping=True)
+
+    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+    formatted_summary = "\n".join(textwrap.wrap(summary, width=80))
+    # word_count = len(formatted_summary)
+    st.session_state.summary_word_count = len(formatted_summary.split())
+    return formatted_summary
+    # return summary
+
+def words_to_tokens(words):
+    """
+    Converts words to approximate token count.
+
+    Parameters:
+    - words (int): Number of words.
+
+    Returns:
+    - int: Approximate token count.
+    """
+    return int(words / 0.75)
+
+def tokens_to_words(tokens):
+    """
+    Converts tokens to approximate word count.
+
+    Parameters:
+    - tokens (int): Number of tokens.
+
+    Returns:
+    - int: Approximate word count.
+    """
+    return int(tokens * 0.75)
 
 def main():
     st.header("Chat with PDF Seamlessly")
@@ -302,13 +351,18 @@ def main():
         st.title("File Upload")
         pdf_docs = st.file_uploader(
             "Upload your PDF Files and Click on the Submit & Process Button", 
-            accept_multiple_files=True, 
+            # accept_multiple_files=True,
+            accept_multiple_files=False, 
             type=["pdf"]
         )
 
         st.header("Summarization Settings")
-        max_length = st.slider("Maximum Summary Length (tokens)", min_value=50, max_value=150, value=100)
-        min_length = st.slider("Minimum Summary Length (tokens)", min_value=10, max_value=50, value=20)
+        max_length_words = st.slider("Maximum Summary Length (words)", min_value=120, max_value=400, value=250)
+        max_length = words_to_tokens(max_length_words)
+        min_length_words = st.slider("Minimum Summary Length (words)", min_value=50, max_value=200, value=180)
+        min_length = words_to_tokens(min_length_words)
+
+        st.markdown(f"**Converted to tokens:**\n Max Length = {max_length} tokens, Min Length = {min_length} tokens")
         
         if st.button("Submit & Process"):
             if not pdf_docs:
@@ -320,8 +374,9 @@ def main():
                         if not raw_text.strip():
                             st.warning("No text extracted from the PDF.")
                         else:
-                            summary = generate_bart_summary(raw_text, summarizer, max_length=max_length, min_length=min_length)
-                            
+                            # summary = generate_bart_summary(raw_text, summarizer, max_length=max_length, min_length=min_length)
+                            summary = text_summarizer_from_pdf(extract_text_from_pdf(pdf_docs), max_length, min_length)
+
                             st.session_state.raw_text = raw_text
                             st.session_state.summary = summary
                             st.success("Processing completed!")

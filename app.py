@@ -296,20 +296,39 @@ def extract_text_from_pdf(pdf_path):
     doc.close()
     return text
 
-def text_summarizer_from_pdf(pdf_text, max_len = 500, min_len = 180):
+def load_model_and_tokenizer():
     model_name = "facebook/bart-large-cnn"
     model = BartForConditionalGeneration.from_pretrained(model_name)
     tokenizer = BartTokenizer.from_pretrained(model_name)
+    return model, tokenizer
 
-    inputs = tokenizer.encode("summarize: " + pdf_text, return_tensors="pt", max_length=1024, truncation=True, )
+def text_summarizer_from_pdf(pdf_text, max_len=500, min_len=180):
+    model, tokenizer = load_model_and_tokenizer()
+
+    inputs = tokenizer.encode("summarize: " + pdf_text, return_tensors="pt", max_length=1024, truncation=True)
     summary_ids = model.generate(inputs, max_length=max_len, min_length=min_len, length_penalty=2.0, num_beams=4, early_stopping=True)
 
     summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     formatted_summary = "\n".join(textwrap.wrap(summary, width=80))
-    # word_count = len(formatted_summary)
+
+    # Store word count in session state
     st.session_state.summary_word_count = len(formatted_summary.split())
     return formatted_summary
-    # return summary
+
+# def text_summarizer_from_pdf(pdf_text, max_len = 500, min_len = 180):
+#     model_name = "facebook/bart-large-cnn"
+#     model = BartForConditionalGeneration.from_pretrained(model_name)
+#     tokenizer = BartTokenizer.from_pretrained(model_name)
+
+#     inputs = tokenizer.encode("summarize: " + pdf_text, return_tensors="pt", max_length=1024, truncation=True, )
+#     summary_ids = model.generate(inputs, max_length=max_len, min_length=min_len, length_penalty=2.0, num_beams=4, early_stopping=True)
+
+#     summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+#     formatted_summary = "\n".join(textwrap.wrap(summary, width=80))
+#     # word_count = len(formatted_summary)
+#     st.session_state.summary_word_count = len(formatted_summary.split())
+#     return formatted_summary
+#     # return summary
 
 def words_to_tokens(words):
     """

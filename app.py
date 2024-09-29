@@ -296,6 +296,7 @@ def extract_text_from_pdf(pdf_path):
     doc.close()
     return text
 
+@st.cache_resource
 def load_model_and_tokenizer():
     model_name = "facebook/bart-large-cnn"
     model = BartForConditionalGeneration.from_pretrained(model_name)

@@ -14,7 +14,7 @@ import streamlit as st
 from streamlit_markmap import markmap
 # from transformers import pipeline
 from transformers import BartForConditionalGeneration, BartTokenizer
-import fitz  # PyMuPDF'
+import fitz  # PyMuPDF
 import textwrap
 import torch
 import wordninja

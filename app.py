@@ -22,7 +22,7 @@ import nltk
 import re
 from nltk.tokenize import sent_tokenize
 
-nltk.download('punkt_tab')
+nltk.download('punkt_tab') # or punkt
 nltk.download('stopwords')
 
 st.set_page_config("Document Dialogue", layout="wide")
